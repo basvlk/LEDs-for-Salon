@@ -30,17 +30,15 @@
  * -- If there are less Bytes in the buffer than expected, the program waits until (CommsTimeout) and if they haven't arrived, discards the Bytes
  * -- If there are too many Bytes in the buffer, the program doesn't trust the information, and discards all Bytes in the buffer.
  * - If the Bytes in the buffer correspond to the Datalength, the bytes can be read either into an array or into variables - but this is done within the 'cases' or Modes
+ * - Either way, once the program continues into a Mode, the amount of data in the serial buffer is valid, it's not too short and not too long, no further checking is required.
  * (3) 2 kinds of Modes:
  * 0-99 are "OnceModes": they make the Arduino 'do' something once, like:
      * (a) Do things like switch all LEDs on and off (1=Off, 2=White, 3=Red. 4=Green, 5=Blue
      * (b) Mode 10-98 is to activate presets 10-98
      * (c) Mode 9 sets the variable preset StateX, based on incoming bytes
      * (d) Mode 99 is for changing the Diagnostic settings
- * 100-199  Preset modes: allow the loading of preset configurations of the entire LED string. They are slow to load but stored on the Arduino for quick retrieval
- * - Modes
- * - Mode 0 does Nothing. There's a reason for that:
- * - Mode 1-99 One-OFF modes, for example reading in a set of bytes to store in an Array, set 'Mode = 0' at the end of doing their job: this way the case for One-off modes runs only once
- * - Mode 100 - 199 CONTINUOUS  modes, where until the mode is changed, we want the program to keep executing this mode.
+ * 100-199  Continuous modes (ContMode): Modes that have time-based effects and need to be visited every loop. until the mode is changed, we want the program to keep executing this mode.
+
  **/
 
 //LED SETUP
@@ -362,10 +360,25 @@ void loop()
         OnceMode = 0;      // Refresh LED states
         break;
       }
-    case 5: //All RED
+    case 5: //All Blue
       {
         for (int i = 0; i < strip.numPixels(); i++) {
           strip.setPixelColor(i, strip.Color(0, 0, 255)); // Erase pixel, but don't refresh!
+        }
+        strip.show();
+        OnceMode = 0;      // Refresh LED states
+        break;
+      }
+      case 6: //All Same
+      {
+        int r;
+        int g;
+        int b;
+        r = Serial.read();
+        g = Serial.read();
+        b = Serial.read();
+        for (int i = 0; i < strip.numPixels(); i++) {
+          strip.setPixelColor(i, strip.Color(r, g, b)); // Erase pixel, but don't refresh!
         }
         strip.show();
         OnceMode = 0;      // Refresh LED states
