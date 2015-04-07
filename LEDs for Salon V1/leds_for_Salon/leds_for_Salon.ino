@@ -22,16 +22,20 @@
  * - the first Byte of any message is '255'
  * - the second byte is 'Mode' which is used further down in the program for 'cases'
  * - the third Byte is 'DataLength" and says how many bytes will follow: this is the actual data. if '0' it means no further Bytes follow
- * - messages are thus always a minimum of THREE Bytes: 1:Begin ("255") 2:Mode 3:DataLength
+ * - As a result, messages are always a minimum of THREE Bytes: 1:Begin ("255") 2:Mode 3:DataLength
  * - the program waits with reading in Bytes until there are a minimum of 3 Bytes in the buffer. Then it starts reading them.
- * - Once >3 Bytes are recieved if the first is a '255' it kicks off a reading cycle. If a different value is received, it is discarded
+ * - Once >3 Bytes are received if the first is a '255' it kicks off a reading cycle. If a different value is received, it is discarded
  * (2) Reading in the DataBytes
  * - if DataLength > 0, first a check is being done on whether the number of Bytes in the buffer is correct for the Datalength of the message:
  * -- If there are less Bytes in the buffer than expected, the program waits until (CommsTimeout) and if they haven't arrived, discards the Bytes
  * -- If there are too many Bytes in the buffer, the program doesn't trust the information, and discards all Bytes in the buffer.
  * - If the Bytes in the buffer correspond to the Datalength, the bytes can be read either into an array or into variables - but this is done within the 'cases' or Modes
- * - 2 kinds of Modes:
- * 0-99 are Performance modes and make the Arduino 'do' something (like switch LEDs on and off, or switch between presets)
+ * (3) 2 kinds of Modes:
+ * 0-99 are "OnceModes": they make the Arduino 'do' something once, like:
+     * (a) Do things like switch all LEDs on and off (1=Off, 2=White, 3=Red. 4=Green, 5=Blue
+     * (b) Mode 10-98 is to activate presets 10-98
+     * (c) Mode 9 sets the variable preset StateX, based on incoming bytes
+     * (d) Mode 99 is for changing the Diagnostic settings
  * 100-199  Preset modes: allow the loading of preset configurations of the entire LED string. They are slow to load but stored on the Arduino for quick retrieval
  * - Modes
  * - Mode 0 does Nothing. There's a reason for that:
@@ -83,10 +87,10 @@ byte STATE10[nLEDs * 3] = {
   0, 48, 56, 43, 78, 0, 8, 74, 0, 0, 74, 25, 0, 85, 72, 0, 50, 86, 0, 11, 85, 31, 0, 83, 0, 48, 56, 43, 78, 0,
 };
 byte STATE11[nLEDs * 3] = {
-  105, 0, 71, 0, 3, 101, 0, 23, 67, 0, 153, 205, 0, 153, 205, 0, 23, 67, 0, 3, 101, 105, 0, 71, 105, 0, 71, 0, 3, 101, 
-  105, 0, 71, 0, 3, 101, 0, 23, 67, 0, 153, 205, 0, 153, 205, 0, 23, 67, 0, 3, 101, 105, 0, 71, 105, 0, 71, 0, 3, 101, 
-  105, 0, 71, 0, 3, 101, 0, 23, 67, 0, 153, 205, 0, 153, 205, 0, 23, 67, 0, 3, 101, 105, 0, 71, 105, 0, 71, 0, 3, 101, 
-  105, 0, 71, 0, 3, 101, 0, 23, 67, 0, 153, 205, 0, 153, 205, 0, 23, 67, 0, 3, 101, 105, 0, 71, 105, 0, 71, 0, 3, 101, 
+  105, 0, 71, 0, 3, 101, 0, 23, 67, 0, 153, 205, 0, 153, 205, 0, 23, 67, 0, 3, 101, 105, 0, 71, 105, 0, 71, 0, 3, 101,
+  105, 0, 71, 0, 3, 101, 0, 23, 67, 0, 153, 205, 0, 153, 205, 0, 23, 67, 0, 3, 101, 105, 0, 71, 105, 0, 71, 0, 3, 101,
+  105, 0, 71, 0, 3, 101, 0, 23, 67, 0, 153, 205, 0, 153, 205, 0, 23, 67, 0, 3, 101, 105, 0, 71, 105, 0, 71, 0, 3, 101,
+  105, 0, 71, 0, 3, 101, 0, 23, 67, 0, 153, 205, 0, 153, 205, 0, 23, 67, 0, 3, 101, 105, 0, 71, 105, 0, 71, 0, 3, 101,
   105, 0, 71, 0, 3, 101, 0, 23, 67, 0, 153, 205, 0, 153, 205, 0, 23, 67, 0, 3, 101, 105, 0, 71, 105, 0, 71, 0, 3, 101,
 };
 byte STATE12[nLEDs * 3] = {
@@ -151,36 +155,48 @@ void setup() {
   Serial.begin(9600);
   pinMode(ArduinoLedPin, OUTPUT);
   strip.begin();
-  strip.show(); // Initialize all pixels to 'off'
+  strip.show();
+  for (int i = 0; i < nLEDs; i++) {
+    strip.setPixelColor(i, strip.Color(100, 0, 0));
+    delay(50);
+    strip.show();              // Refresh LED states
+  }
+  for (int i = 0; i < nLEDs; i++) {
+    strip.setPixelColor(i, strip.Color(0, 100, 0));
+    delay(50);
+    strip.show();              // Refresh LED states
+  }
+  for (int i = 0; i < nLEDs; i++) {
+    strip.setPixelColor(i, 0);
+    delay(50);
+    strip.show();              // Refresh LED states
+  }
 
-  strip.setPixelColor(3, strip.Color(10, 0, 20)); // Set new pixel 'on'
-  strip.show();              // Refresh LED states
 }
 
 //**********************************************************
-//*************         M A i N       **********************
+//*************         M A I N       **********************
 //**********************************************************
 
 void loop()
 {
   ++LoopIteration;
+  LoopBlink(LoopIteration);
   BytesInBuffer = Serial.available();
   Serial.print("]");
   Serial.println(BytesInBuffer);
   if (BytesInBuffer == 0) {
     DiscardedBytes = 0;
   }
-  if (Diagnostic == 1) {
-    delay(Slowdown);
-    Serial.print("[ **** NEW LOOP: ");
-    Serial.println(LoopIteration);
-    Serial.print("[ currentMillis: ");
-    Serial.println(currentMillis);
-    Serial.print("[ Slowdown: ");
-    Serial.println(Slowdown);
-    LoopBlink(LoopIteration);
-  }
-
+  if (Diagnostic == 1) {                  //Diag
+    delay(Slowdown);                      //Diag
+    Serial.print(F("[ **** NEW LOOP: "));    //Diag
+    Serial.println(LoopIteration);        //Diag
+    Serial.print(F("[ currentMillis: "));    //Diag
+    Serial.println(currentMillis);        //Diag
+    Serial.print(F("[ Slowdown: "));         //Diag
+    Serial.println(Slowdown);             //Diag
+  }                                       //Diag
 
   // Start when data arrived
   if (BytesInBuffer > 2) // all messages are minimum 3 Bytes so are waiting for 3 before getting going.
@@ -190,7 +206,9 @@ void loop()
       //*************        R E A D       **********************
 
     { // SECTION 1: MODE and LENGTH
-      Serial.println("Entered reading section: >=3 Bytes in buffer, first is 255");
+      if (Diagnostic == 1) {
+        Serial.println(F("Entered reading section, ergo >=3 Bytes in buffer, first is 255"));
+      }
       PrevContMode = ContMode; //before reading in the mode, backing up the previous modes
       PrevOnceMode = OnceMode;
 
@@ -204,18 +222,19 @@ void loop()
       if (Mode < 100) {
         OnceMode = Mode;
       }
-      if (Diagnostic == 1) {
-        Serial.print("[ Mode: ");
-        Serial.print(Mode);
-        Serial.print(" // New ContMode: ");
-        Serial.print(ContMode);
-        Serial.print(" // New OnceMode: ");
-        Serial.println(OnceMode);
-        Serial.print("[ DataLength: ");
-        Serial.print(DataLength);
-        Serial.print(" - Bytes in Buffer: ");
-        Serial.println(BytesInBuffer);
-      }
+      
+      if (Diagnostic == 1) {                     //Diag
+        Serial.print(F("[ Mode: "));             //Diag
+        Serial.print(Mode);                      //Diag
+        Serial.print(F(" // New ContMode: "));   //Diag
+        Serial.print(ContMode);                  //Diag
+        Serial.print(F(" // New OnceMode: "));   //Diag
+        Serial.println(OnceMode);                //Diag
+        Serial.print(F("[ DataLength: "));       //Diag
+        Serial.print(DataLength);                //Diag
+        Serial.print(F(" - Bytes in Buffer: ")); //Diag
+        Serial.println(BytesInBuffer);           //Diag
+      }                                          //Diag
 
       //NOT ENOUGH BYTES
       if (BytesInBuffer < DataLength) {
@@ -227,25 +246,26 @@ void loop()
 
         while ( (BytesInBuffer < DataLength) && (WaitedForBytes < CommsTimeout )) {
           BytesInBuffer = Serial.available();
-          if (Diagnostic == 1) {
-            Serial.print("[ DataLength: ");
-            Serial.print(DataLength);
-            Serial.print("=> BytesInBuffer: ");
-            Serial.println (BytesInBuffer);
-            Serial.print("[ CommsTimeout: ");
-            Serial.print(CommsTimeout);
-            Serial.print("=> WaitedForBytes: ");
+          
+          if (Diagnostic == 1) {                      //Diag
+            Serial.print(F("[ DataLength: "));        //Diag
+            Serial.print(DataLength);                 //Diag
+            Serial.print(F("=> BytesInBuffer: "));    //Diag
+            Serial.println (BytesInBuffer);           //Diag
+            Serial.print(F("[ CommsTimeout: "));      //Diag
+            Serial.print(CommsTimeout);               //Diag
+            Serial.print(F("=> WaitedForBytes: "));  //Diag
             Serial.println(WaitedForBytes);
           }
           WaitedForBytes = (millis() - StartMillis);
         }
         /// End of while loop. Now there are 2 options: either the bytes arrived, or they didn't and the thing timed out
         if (BytesInBuffer == DataLength) {
-          if (Diagnostic == 1) {
-            Serial.print("[ Bytes arrived after waiting for  ");
-            Serial.print(WaitedForBytes);
-            Serial.println("ms");
-          }
+          if (Diagnostic == 1) {                                 //Diag
+            Serial.print(F("[ Bytes arrived after waiting for ")); //Diag
+            Serial.print(WaitedForBytes);                        //Diag
+            Serial.println(F("ms"));                                //Diag
+          }                                                      //Diag
         }
 
         if (BytesInBuffer < DataLength) {
@@ -264,12 +284,12 @@ void loop()
 
       //TOO MANY BYTES
       if (BytesInBuffer > DataLength) {
-        if (Diagnostic == 1) {
-          Serial.println("[ Entering 'TOO MANY BYTES");
-        }
-        Serial.print("[ ERROR: ");
+        if (Diagnostic == 1) {                               //Diag
+          Serial.println("[ Entering 'TOO MANY BYTES");      //Diag
+        }                                                    //Diag
+        Serial.print("[ ERROR: ");                          
         Serial.print(BytesInBuffer - DataLength);
-        Serial.println(" too many Bytes in buffer. Dumping data ");
+        Serial.println(" too many Bytes in buffer. Dumping all data, not doing anything");
         char dump[BytesInBuffer];
         Serial.readBytes(dump, BytesInBuffer);
         ContMode = PrevContMode; //restoring the previous modes so operation continues unchanged despite the invalid data
@@ -277,24 +297,25 @@ void loop()
       }
 
     }
-    else // IF 3 bytes or more AND the first is not '255'; cycle back to start without doing anything with the read Byte
+    else // IF 3 bytes or more AND the first is not '255'; cycle back to start without doing anything with the read Byte: 
+        // effectively this just removes the first Byte, and leaves the remaining in the buffer
     {
       ++DiscardedBytes;
       Serial.print("[ ERROR: Bytes received not starting with '255' Discarded: ");
       Serial.println(DiscardedBytes);
-    } //End invalid data section (ie data did not start with '255' and is non-255 byte is discarded)
+    } //End invalid data section (ie data did not start with '255' and is non-255 byte is discarded. The rest is left intact in case it is the start of a valid message)
   } // End reading / discarding data section which only runs when there are 3 Bytes or ore in the buffer
 
 
 
   ////// BRIDGE section, between validating the incoming data, and reading in the data (if valid)
-  if (Diagnostic == 1) {
-    Serial.print("[ Last read Mode: ");
-    Serial.print(Mode);
-    Serial.print(" // Current ContMode: ");
-    Serial.print(ContMode);
-    Serial.print(" // Current OnceMode: ");
-    Serial.println(OnceMode);
+  if (Diagnostic == 1) {                    //Diag
+    Serial.print("[ Last read Mode: ");     //Diag
+    Serial.print(Mode);                     //Diag
+    Serial.print(" // Current ContMode: "); //Diag
+    Serial.print(ContMode);                 //Diag
+    Serial.print(" // Current OnceMode: "); //Diag
+    Serial.println(OnceMode);               //Diag
   }
 
 
