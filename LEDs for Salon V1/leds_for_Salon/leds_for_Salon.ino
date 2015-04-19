@@ -68,6 +68,7 @@ unsigned long WaitedForBytes = 0;      //variable to time how long we've been wa
 unsigned long ContLoopMillis = 0;  // will store last time at the end of the previous CONT loop
 int ContLoopIteration = 0;
 int ContCurrentStep = 0;
+int invert = 1; // allows for fade in to turn to fadeout
 
 //DIAGNOSTIC TOOLS
 int Diagnostic = 0;                // switches on all kinds of diagnostic feedback from various locations in the program
@@ -598,7 +599,7 @@ void loop()
         if (Diagnostic == 1) {
           Serial.println("[ Continuous Mode 1 - fill in details later");
         }
-        rainbowCycle(100);
+        rainbowCycle(0);
 
         break;
       }
@@ -608,7 +609,7 @@ void loop()
         if (Diagnostic == 1) {
           Serial.println("[ Continuous Mode 1 - fill in details later");
         }
-        rainbowCycle(20);
+        rainbowCycle(2);
 
         break;
       }
@@ -617,7 +618,7 @@ void loop()
         if (Diagnostic == 1) {
           Serial.println("[ Continuous Mode 1 - fill in details later");
         }
-        rainbow(20);
+        rainbow(5);
 
         break;
       }
@@ -626,7 +627,7 @@ void loop()
         if (Diagnostic == 1) {
           Serial.println("[ Continuous Mode 1 - fill in details later");
         }
-        fader(1000);
+        rainbow(20);
 
         break;
       }
@@ -635,7 +636,7 @@ void loop()
         if (Diagnostic == 1) {
           Serial.println("[ Continuous Mode 1 - fill in details later");
         }
-        fader(500);
+        rainbow(40);
 
         break;
       }
@@ -649,7 +650,7 @@ void loop()
 
         break;
       }
-          case 107:
+    case 107:
       {
         if (Diagnostic == 1) {
           Serial.println("[ Continuous Mode 1 - fill in details later");
@@ -659,6 +660,43 @@ void loop()
         break;
       }
 
+    case 110:
+      {
+        if (Diagnostic == 1) {
+          Serial.println("[ Continuous Mode 1 - fill in details later");
+        }
+        fader(1000);
+
+        break;
+      }
+
+    case 111:
+      {
+        if (Diagnostic == 1) {
+          Serial.println("[ Continuous Mode 1 - fill in details later");
+        }
+        fader(500);
+
+        break;
+      }
+    case 112:
+      {
+        if (Diagnostic == 1) {
+          Serial.println("[ Continuous Mode 1 - fill in details later");
+        }
+        fader(30000);
+
+        break;
+      }
+    case 113:
+      {
+        if (Diagnostic == 1) {
+          Serial.println("[ Continuous Mode 1 - fill in details later");
+        }
+        fader(0);
+
+        break;
+      }
 
     default:
       if (Diagnostic == 1) {
@@ -672,11 +710,7 @@ void loop()
 
   //*************       L A S T  P A R T  O F  M A I N  P R O G R A M      **********************
 
-  currentMillis = millis();
-  if (LooptimeDiag == 1) {
-    Serial.print("[ Looptime: ");
-    Serial.println(currentMillis - previousMillis);
-  }
+
   if (ArrayDiag == 1)
   {
     ArrayToSerial(STATEX, nLEDs * 3);
@@ -690,7 +724,11 @@ void loop()
   if (Diagnostic == 1) {
     Serial.print("[ **** END OF LOOP ");
     Serial.print(LoopIteration);
-    Serial.print(",   Looptime: ");
+  }
+
+  currentMillis = millis();
+  if (LooptimeDiag == 1) {
+    Serial.print("[ Looptime: ");
     Serial.println(currentMillis - previousMillis);
   }
   previousMillis = currentMillis;
@@ -762,82 +800,20 @@ void rainbow(uint8_t wait) {
 }
 
 
-void blinker(uint8_t cycletime) {
-  //float Fraction = 1;
-  // Fraction = 255*((millis() - PreviousMillis) / cycletime);
-  //   stepsize = (int) Fraction;
-  // previousMillis
-
-  if ((millis()-ContLoopMillis) > cycletime)
-  {ContLoopIteration++ ;
-  if (ContLoopIteration %2) {
-  for (int i = 0; i < strip.numPixels(); i++) {
-    strip.setPixelColor(i, strip.Color(255, 255, 255)); // Erase pixel, but don't refresh!
-  }
-}
-else
-{
-  for (int i = 0; i < strip.numPixels(); i++) {
-    strip.setPixelColor(i, 0); // Erase pixel, but don't refresh!
-  }
-}
-
-strip.show();
-ContLoopMillis = millis();
-}
-}
-
-
-// FADER
-void fader(uint32_t cycletime) {
-float Fraction = 1;
-// Fraction = 255*((millis() - ContLoopMillis) / cycletime);
-Fraction = 200 /1000;
-int stepsize = (int) Fraction;
-// ContCurrentStep = ContCurrentStep + stepsize;
-ContCurrentStep++ ;
-if (ContCurrentStep>255) {ContCurrentStep=0;}
-
-Serial.print(F("(millis() - ContLoopMillis) = "));
-Serial.println((millis() - ContLoopMillis));
-Serial.print(F("cycletime = "));
-Serial.println(cycletime);
-
-Serial.print(F("Stepsize = "));
-Serial.println(stepsize);
-Serial.print(F("ContCurrentStep = "));
-Serial.println(ContCurrentStep);
-
-
-  
-  {ContLoopIteration++ ;
-  if (ContLoopIteration %2) {
-  for (int i = 0; i < strip.numPixels(); i++) {
-    strip.setPixelColor(i, strip.Color(ContCurrentStep, 0, 0)); // Erase pixel, but don't refresh!
-  }
-}
-
-
-strip.show();
-
-}
-ContLoopMillis = millis();
-}
-
-
 
 // Slightly different, this makes the rainbow equally distributed throughout
 void rainbowCycle(uint8_t wait) {
   uint16_t i, j;
-
-
-
+  
+  if (!ContLoopIteration){
   for (j = 0; j < 256 * 5; j++) { // 5 cycles of all colors on wheel
     for (i = 0; i < strip.numPixels(); i++) {
       strip.setPixelColor(i, Wheel(((i * 256 / strip.numPixels()) + j) & 255));
     }
-    strip.show();
-    delay (wait);
+    strip.show();}
+    
+    ContLoopIteration++;
+      if (ContLoopIteration > wait) {ContLoopIteration=0;}
   }
 }
 
@@ -894,36 +870,68 @@ uint32_t Wheel(byte WheelPos) {
   }
 }
 
+void blinker(uint8_t cycletime) {
+  //float Fraction = 1;
+  // Fraction = 255*((millis() - PreviousMillis) / cycletime);
+  //   stepsize = (int) Fraction;
+  // previousMillis
+
+  if ((millis() - ContLoopMillis) > cycletime)
+  { ContLoopIteration++ ;
+    if (ContLoopIteration % 2) {
+      for (int i = 0; i < strip.numPixels(); i++) {
+        strip.setPixelColor(i, strip.Color(255, 255, 255)); // Erase pixel, but don't refresh!
+      }
+    }
+    else
+    {
+      for (int i = 0; i < strip.numPixels(); i++) {
+        strip.setPixelColor(i, 0); // Erase pixel, but don't refresh!
+      }
+    }
+
+    strip.show();
+    ContLoopMillis = millis();
+  }
+}
 
 
+// FADER
+void fader(uint32_t cycletime) {
+
+  int stepsize = constrain ( map ( (millis() - ContLoopMillis), 0, cycletime , 0, 255) ,0,255);
+  if (stepsize) {
+    ContLoopMillis = millis(); // if the stepsize = 0 (ie the change is superslow and LEDs don't need to be updated
+  }
+  ContCurrentStep +=  stepsize;
+  if (ContCurrentStep > 255) {
+    ContCurrentStep = 0;
+    //    Serial.println("  OVER 255 WHOOHOO ");
+    //  invert = -invert;
+  }
+  Serial.print("  cycletime= ");
+  Serial.print(cycletime);
+  Serial.print("  (millis() - ContLoopMillis)= ");
+  Serial.print((millis() - ContLoopMillis));
+
+  Serial.print("stepsize=");
+  Serial.print(stepsize);
+  Serial.print("  ContCurrentStep= ");
+  Serial.print(ContCurrentStep);
+  Serial.print("  invert= ");
+  Serial.println(invert);
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+  {
+    for (int i = 0; i < strip.numPixels(); i++) {
+      strip.setPixelColor(i, strip.Color(ContCurrentStep, 0, 0)); // Erase pixel, but don't refresh!
+    }
+    strip.show();
+  }
+  if (stepsize) {
+    ContLoopMillis = millis(); // if the stepsize = 0 (ie the change is superslow and LEDs don't need to be updated every cycle, keep counting time
+  }
+}
 
 
 
