@@ -39,6 +39,14 @@
      * (d) Mode 99 is for changing the Diagnostic settings
  * 100-199  Continuous modes (ContMode): Modes that have time-based effects and need to be visited every loop. until the mode is changed, we want the program to keep executing this mode.
 
+ **************************
+ ***** BUTTON COMMUNICATION
+ **************************
+ * the PIN on the arduino is directly connected to GND via a 10k resistor, keeping it at GND
+ * the button lifts the pin up to 5V
+ * So connections:
+     5V - button leg1 - button leg 2 - arduino pin
+     arduino GND - 10k - arduino pin  x
  **/
 
 //LED SETUP
@@ -55,6 +63,11 @@ int BytesInBuffer = 0;             // number of unread Bytes waiting in the seri
 int DiscardedBytes = 0;            // number of Bytes discarded (read out of the serial buffer but not used) since the last start of a read operation. Indicates something is wrong
 unsigned long CommsTimeout = 200;    // When the program is expecting X bytes to arrive, this is how long it will wait before discarding
 unsigned long WaitedForBytes = 0;      //variable to time how long we've been waiting for the required bytes to arrive. To use to break out of a loop when Bytes don't arrive
+
+/// For Cont loop timing
+unsigned long ContLoopMillis = 0;  // will store last time at the end of the previous CONT loop
+int ContLoopIteration = 0;
+int ContCurrentStep = 0;
 
 //DIAGNOSTIC TOOLS
 int Diagnostic = 0;                // switches on all kinds of diagnostic feedback from various locations in the program
@@ -74,12 +87,25 @@ byte DataLength = 0;
 int colorByte = 0;
 
 // HW control - Buttons!
+//ModeButton
 const int ModeButtonPin = 2;     // the number of the pushbutton pin
 int ModeButtonState = 0;
 int ModeLoopState = 1; // OnceModes are automatically set back to '0' at the end of the loop. Thi is to carry over the previous mode to be able to iterate through ONceMOdes
 unsigned long ModeButtonLastClick = 0;
 unsigned long ButtonClickTimer = 700; //once a button click is read, it's ignored for ButtenClickTimer ms
 int ButtonModeTable[10] = { 4, 1, 3, 4, 5, 10, 11, 12, 13, 14 }; // determines which presets, and in what order are cycled
+//ColorButton
+const int ColorButtonPin = 3;     // the number of the pushbutton pin
+int ColorButtonState = 0;
+int ColorButtonLoopState = 1;
+unsigned long ColorButtonLastClick = 0;
+//Button3
+const int Button3Pin = 4;     // the number of the pushbutton pin
+int Button3State = 0;
+int Button3LoopState = 1; // OnceModes are automatically set back to '0' at the end of the loop. Thi is to carry over the previous mode to be able to iterate through ONceMOdes
+unsigned long Button3LastClick = 0;
+
+
 
 // PRESETS - The following arrays form Presets for 10 LEDs: They are 10x3 long - patterns are repeated every 10 LEDs
 byte STATEX[30] = {
@@ -130,7 +156,7 @@ byte STATE15[nLEDs * 3] = {
   105, 0, 71, 0, 3, 101, 0, 23, 67, 0, 153, 205, 0, 153, 205, 0, 23, 67, 0, 3, 101, 105, 0, 71, 105, 0, 71, 0, 3, 101,
   105, 0, 71, 0, 3, 101, 0, 23, 67, 0, 153, 205, 0, 153, 205, 0, 23, 67, 0, 3, 101, 105, 0, 71, 105, 0, 71, 0, 3, 101,
   105, 0, 71, 0, 3, 101, 0, 23, 67, 0, 153, 205, 0, 153, 205, 0, 23, 67, 0, 3, 101, 105, 0, 71, 105, 0, 71, 0, 3, 101,
-  105, 0, 71, 0, 3, 101, 0, 23, 67, 0, 153, 205, 0, 153, 205, 0, 23, 67, 0, 3, 101, 105, 0, 71, 105, 0, 71, 0, 3, 101, 100, 0, 100, 255, 0, 0,0, 23,
+  105, 0, 71, 0, 3, 101, 0, 23, 67, 0, 153, 205, 0, 153, 205, 0, 23, 67, 0, 3, 101, 105, 0, 71, 105, 0, 71, 0, 3, 101, 100, 0, 100, 255, 0, 0, 0, 23,
 };
 byte STATE16[nLEDs * 3] = {
   0, 10, 0, 0, 0, 10, 10, 10, 10, 10, 0, 0, 0, 10, 0, 0, 0, 10, 10, 10, 10, 10, 0, 0,
@@ -182,6 +208,8 @@ void setup() {
   Serial.begin(9600);
   pinMode(ArduinoLedPin, OUTPUT);
   pinMode(ModeButtonPin, INPUT);
+  pinMode(ColorButtonPin, INPUT);
+  pinMode(Button3Pin, INPUT);
 
   strip.begin();
   strip.show();
@@ -209,7 +237,7 @@ void setup() {
 
 void loop()
 {
-  
+
   // Start of loop housekeeping
   currentMillis = millis();
   ++LoopIteration;
@@ -225,38 +253,23 @@ void loop()
     Serial.println(Slowdown);             //Diag
   }                                       //Diag
 
-  ////this section reads the buttons
-
+  //START Button reading
   if ( (currentMillis - ModeButtonLastClick) > ButtonClickTimer) {
-    Serial.println(F("[ entering Buttonloop"));
-ModeButtonState = digitalRead(ModeButtonPin) ;
+    if (Diagnostic == 1) {                  //Diag
+      Serial.println(F("[ entering Buttonloop"));
+    }
+    ModeButtonState = digitalRead(ModeButtonPin) ;
 
     if (ModeButtonState) {
-      Serial.print(F("[ OnceMode before: "));
-      Serial.println(OnceMode);
       ModeLoopState++ ;
       if (ModeLoopState > 9) {
-        ModeLoopState = 0;}
+        ModeLoopState = 0;
+      }
       OnceMode = ButtonModeTable[ModeLoopState];
       ModeButtonLastClick = currentMillis ;
-      }
-     Serial.print(F("[ ModeLoopState after +1: "));
-      Serial.println(ModeLoopState);
-      Serial.print(F("[ ButtonModeTable end of cycle: "));
-      Serial.println(ButtonModeTable[ModeLoopState]);
-      Serial.print(F("[ OnceMode end of cycle: "));
-      Serial.println(OnceMode); ButtonModeTable[ModeLoopState];
     }
-
- 
-
-  Serial.print(F("[ current millis: "));
-  Serial.println(millis());
-  Serial.print(F("ModeButtonLastClick outside clickloop: "));
-  Serial.println(ModeButtonLastClick);
-
-
-
+  }
+  // END Button reading
 
   BytesInBuffer = Serial.available();
   Serial.print("]");
@@ -273,9 +286,9 @@ ModeButtonState = digitalRead(ModeButtonPin) ;
       //*************        R E A D       **********************
 
     { // SECTION 1: MODE and LENGTH
-      if (Diagnostic == 1) {
+      if (Diagnostic == 1) {                    //Diag
         Serial.println(F("Entered reading section, ergo >=3 Bytes in buffer, first is 255"));
-      }
+      }                                        //Diag
       PrevContMode = ContMode; //before reading in the mode, backing up the previous modes
       PrevOnceMode = OnceMode;
 
@@ -288,6 +301,7 @@ ModeButtonState = digitalRead(ModeButtonPin) ;
       }
       if (Mode < 100) {
         OnceMode = Mode;
+        ContMode = 0;
       }
 
       if (Diagnostic == 1) {                     //Diag
@@ -572,13 +586,79 @@ ModeButtonState = digitalRead(ModeButtonPin) ;
   switch (ContMode)
 
   { //Start MODES Section
-    case 0:
+    case 100:
       {
         if (Diagnostic == 1) {
           Serial.println("[ Continuous Mode 0 - not doing anything");
         }
         break;
       }
+    case 101:
+      {
+        if (Diagnostic == 1) {
+          Serial.println("[ Continuous Mode 1 - fill in details later");
+        }
+        rainbowCycle(100);
+
+        break;
+      }
+
+    case 102:
+      {
+        if (Diagnostic == 1) {
+          Serial.println("[ Continuous Mode 1 - fill in details later");
+        }
+        rainbowCycle(20);
+
+        break;
+      }
+    case 103:
+      {
+        if (Diagnostic == 1) {
+          Serial.println("[ Continuous Mode 1 - fill in details later");
+        }
+        rainbow(20);
+
+        break;
+      }
+    case 104:
+      {
+        if (Diagnostic == 1) {
+          Serial.println("[ Continuous Mode 1 - fill in details later");
+        }
+        fader(1000);
+
+        break;
+      }
+    case 105:
+      {
+        if (Diagnostic == 1) {
+          Serial.println("[ Continuous Mode 1 - fill in details later");
+        }
+        fader(500);
+
+        break;
+      }
+
+    case 106:
+      {
+        if (Diagnostic == 1) {
+          Serial.println("[ Continuous Mode 1 - fill in details later");
+        }
+        fader(200);
+
+        break;
+      }
+          case 107:
+      {
+        if (Diagnostic == 1) {
+          Serial.println("[ Continuous Mode 1 - fill in details later");
+        }
+        fader(1000);
+
+        break;
+      }
+
 
     default:
       if (Diagnostic == 1) {
@@ -659,74 +739,142 @@ void LoopBlink(int Loop)
 
 // Fill the dots one after the other with a color
 void colorWipe(uint32_t c, uint8_t wait) {
-for(uint16_t i=0; i<strip.numPixels(); i++) {
-strip.setPixelColor(i, c);
-strip.show();
-delay(wait);
-}
+  for (uint16_t i = 0; i < strip.numPixels(); i++) {
+    strip.setPixelColor(i, c);
+    strip.show();
+    delay(wait);
+  }
 }
 
-// 
+//
 void rainbow(uint8_t wait) {
-uint16_t i, j;
+  uint16_t i, j;
 
-for(j=0; j<256; j++) {
-for(i=0; i<strip.numPixels(); i++) {
-strip.setPixelColor(i, Wheel((i+j) & 255));
+
+  for (j = 0; j < 256; j++) {
+    for (i = 0; i < strip.numPixels(); i++) {
+      strip.setPixelColor(i, Wheel((i + j) & 255));
+    }
+    strip.show();
+    delay(wait);
+
+  }
 }
+
+
+void blinker(uint8_t cycletime) {
+  //float Fraction = 1;
+  // Fraction = 255*((millis() - PreviousMillis) / cycletime);
+  //   stepsize = (int) Fraction;
+  // previousMillis
+
+  if ((millis()-ContLoopMillis) > cycletime)
+  {ContLoopIteration++ ;
+  if (ContLoopIteration %2) {
+  for (int i = 0; i < strip.numPixels(); i++) {
+    strip.setPixelColor(i, strip.Color(255, 255, 255)); // Erase pixel, but don't refresh!
+  }
+}
+else
+{
+  for (int i = 0; i < strip.numPixels(); i++) {
+    strip.setPixelColor(i, 0); // Erase pixel, but don't refresh!
+  }
+}
+
 strip.show();
-delay(wait);
+ContLoopMillis = millis();
 }
 }
+
+
+// FADER
+void fader(uint32_t cycletime) {
+float Fraction = 1;
+// Fraction = 255*((millis() - ContLoopMillis) / cycletime);
+Fraction = 200 /1000;
+int stepsize = (int) Fraction;
+// ContCurrentStep = ContCurrentStep + stepsize;
+ContCurrentStep++ ;
+if (ContCurrentStep>255) {ContCurrentStep=0;}
+
+Serial.print(F("(millis() - ContLoopMillis) = "));
+Serial.println((millis() - ContLoopMillis));
+Serial.print(F("cycletime = "));
+Serial.println(cycletime);
+
+Serial.print(F("Stepsize = "));
+Serial.println(stepsize);
+Serial.print(F("ContCurrentStep = "));
+Serial.println(ContCurrentStep);
+
+
+  
+  {ContLoopIteration++ ;
+  if (ContLoopIteration %2) {
+  for (int i = 0; i < strip.numPixels(); i++) {
+    strip.setPixelColor(i, strip.Color(ContCurrentStep, 0, 0)); // Erase pixel, but don't refresh!
+  }
+}
+
+
+strip.show();
+
+}
+ContLoopMillis = millis();
+}
+
 
 
 // Slightly different, this makes the rainbow equally distributed throughout
 void rainbowCycle(uint8_t wait) {
-uint16_t i, j;
+  uint16_t i, j;
 
-for(j=0; j<256*5; j++) { // 5 cycles of all colors on wheel
-for(i=0; i< strip.numPixels(); i++) {
-strip.setPixelColor(i, Wheel(((i * 256 / strip.numPixels()) + j) & 255));
-}
-strip.show();
-delay(wait);
-}
+
+
+  for (j = 0; j < 256 * 5; j++) { // 5 cycles of all colors on wheel
+    for (i = 0; i < strip.numPixels(); i++) {
+      strip.setPixelColor(i, Wheel(((i * 256 / strip.numPixels()) + j) & 255));
+    }
+    strip.show();
+    delay (wait);
+  }
 }
 
 //Theatre-style crawling lights.
 void theaterChase(uint32_t c, uint8_t wait) {
-for (int j=0; j<10; j++) { //do 10 cycles of chasing
-for (int q=0; q < 3; q++) {
-for (int i=0; i < strip.numPixels(); i=i+3) {
-strip.setPixelColor(i+q, c); //turn every third pixel on
-}
-strip.show();
+  for (int j = 0; j < 10; j++) { //do 10 cycles of chasing
+    for (int q = 0; q < 3; q++) {
+      for (int i = 0; i < strip.numPixels(); i = i + 3) {
+        strip.setPixelColor(i + q, c); //turn every third pixel on
+      }
+      strip.show();
 
-delay(wait);
+      delay(wait);
 
-for (int i=0; i < strip.numPixels(); i=i+3) {
-strip.setPixelColor(i+q, 0); //turn every third pixel off
-}
-}
-}
+      for (int i = 0; i < strip.numPixels(); i = i + 3) {
+        strip.setPixelColor(i + q, 0); //turn every third pixel off
+      }
+    }
+  }
 }
 
 //Theatre-style crawling lights with rainbow effect
 void theaterChaseRainbow(uint8_t wait) {
-for (int j=0; j < 256; j++) { // cycle all 256 colors in the wheel
-for (int q=0; q < 3; q++) {
-for (int i=0; i < strip.numPixels(); i=i+3) {
-strip.setPixelColor(i+q, Wheel( (i+j) % 255)); //turn every third pixel on
-}
-strip.show();
+  for (int j = 0; j < 256; j++) { // cycle all 256 colors in the wheel
+    for (int q = 0; q < 3; q++) {
+      for (int i = 0; i < strip.numPixels(); i = i + 3) {
+        strip.setPixelColor(i + q, Wheel( (i + j) % 255)); //turn every third pixel on
+      }
+      strip.show();
 
-delay(wait);
+      delay(wait);
 
-for (int i=0; i < strip.numPixels(); i=i+3) {
-strip.setPixelColor(i+q, 0); //turn every third pixel off
-}
-}
-}
+      for (int i = 0; i < strip.numPixels(); i = i + 3) {
+        strip.setPixelColor(i + q, 0); //turn every third pixel off
+      }
+    }
+  }
 }
 
 
@@ -734,16 +882,16 @@ strip.setPixelColor(i+q, 0); //turn every third pixel off
 // Input a value 0 to 255 to get a color value.
 // The colours are a transition r - g - b - back to r.
 uint32_t Wheel(byte WheelPos) {
-WheelPos = 255 - WheelPos;
-if(WheelPos < 85) {
-return strip.Color(255 - WheelPos * 3, 0, WheelPos * 3);
-} else if(WheelPos < 170) {
-WheelPos -= 85;
-return strip.Color(0, WheelPos * 3, 255 - WheelPos * 3);
-} else {
-WheelPos -= 170;
-return strip.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
-}
+  WheelPos = 255 - WheelPos;
+  if (WheelPos < 85) {
+    return strip.Color(255 - WheelPos * 3, 0, WheelPos * 3);
+  } else if (WheelPos < 170) {
+    WheelPos -= 85;
+    return strip.Color(0, WheelPos * 3, 255 - WheelPos * 3);
+  } else {
+    WheelPos -= 170;
+    return strip.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
+  }
 }
 
 
