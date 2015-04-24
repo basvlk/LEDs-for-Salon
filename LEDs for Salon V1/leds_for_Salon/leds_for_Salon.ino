@@ -51,7 +51,7 @@
 
 //LED SETUP
 #include <Adafruit_NeoPixel.h>
-#define PIN 7 //Pin that connects to the neopixels
+#define PIN 4 //Pin that connects to the neopixels
 const  int nLEDs = 50; // standard arraylength
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(nLEDs, PIN, NEO_RGB + NEO_KHZ800); // the Neopixel stick is "NEO_GRB", the 8mm LEDs are "NEO_RGB"
 
@@ -89,19 +89,19 @@ int colorByte = 0;
 
 // HW control - Buttons!
 //ModeButton
-const int ModeButtonPin = 2;     // the number of the pushbutton pin
+const int ModeButtonPin = 5;     // the number of the pushbutton pin
 int ModeButtonState = 0;
 int ModeLoopState = 1; // OnceModes are automatically set back to '0' at the end of the loop. Thi is to carry over the previous mode to be able to iterate through ONceMOdes
 unsigned long ModeButtonLastClick = 0;
 unsigned long ButtonClickTimer = 700; //once a button click is read, it's ignored for ButtenClickTimer ms
 int ButtonModeTable[10] = { 4, 1, 3, 4, 5, 10, 11, 12, 13, 14 }; // determines which presets, and in what order are cycled
 //ColorButton
-const int ColorButtonPin = 3;     // the number of the pushbutton pin
+const int ColorButtonPin = 6;     // the number of the pushbutton pin
 int ColorButtonState = 0;
 int ColorButtonLoopState = 1;
 unsigned long ColorButtonLastClick = 0;
 //Button3
-const int Button3Pin = 4;     // the number of the pushbutton pin
+const int Button3Pin = 7;     // the number of the pushbutton pin
 int Button3State = 0;
 int Button3LoopState = 1; // OnceModes are automatically set back to '0' at the end of the loop. Thi is to carry over the previous mode to be able to iterate through ONceMOdes
 unsigned long Button3LastClick = 0;
