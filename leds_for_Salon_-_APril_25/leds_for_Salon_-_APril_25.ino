@@ -52,37 +52,40 @@
 //LED SETUP
 #include <Adafruit_NeoPixel.h>
 #define PIN 4 //Pin that connects to the neopixels
-const  byte nLEDs = 50; // standard arraylength
+const  int nLEDs = 50; // standard arraylength
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(nLEDs, PIN, NEO_RGB + NEO_KHZ800); // the Neopixel stick is "NEO_GRB", the 8mm LEDs are "NEO_RGB"
 
 //PROGRAM CONTROL
-const byte ArduinoLedPin =  13  ;   // NOT the NeoPixel data pin!! the number of the Arduino LED pin - it's blinking helps seeing if the program runs
+const int ArduinoLedPin =  13  ;   // NOT the NeoPixel data pin!! the number of the Arduino LED pin - it's blinking helps seeing if the program runs
 unsigned long previousMillis = 0;  // will store last time at the end of the previous loop
 unsigned long currentMillis = 0;  // will store the current time
-byte BytesInBuffer = 0;             // number of unread Bytes waiting in the serial buffer
-byte DiscardedBytes = 0;            // number of Bytes discarded (read out of the serial buffer but not used) since the last start of a read operation. Indicates something is wrong
+int BytesInBuffer = 0;             // number of unread Bytes waiting in the serial buffer
+int DiscardedBytes = 0;            // number of Bytes discarded (read out of the serial buffer but not used) since the last start of a read operation. Indicates something is wrong
 unsigned long CommsTimeout = 200;    // When the program is expecting X bytes to arrive, this is how long it will wait before discarding
-
+unsigned long WaitedForBytes = 0;      //variable to time how long we've been waiting for the required bytes to arrive. To use to break out of a loop when Bytes don't arrive
 
 /// For Cont loop timing
 unsigned long ContLoopMillis = 0;  // will store last time at the end of the previous CONT loop
-byte LoopDelayCounter = 0; // allows to skip a number of loopcycles in Cont Modes.
-byte ContCurrentStep = 0; //For iterations in Cont Loops, to keep the 'current step' and add +1 each time the loop runs
-byte invert = 1; // allows for fade in to turn to fadeout
+int ContLoopIteration = 0;
+int ContCurrentStep = 0;
+int invert = 1; // allows for fade in to turn to fadeout
 
 //DIAGNOSTIC TOOLS
-byte Diagnostic = 0;                // switches on all kinds of diagnostic feedback from various locations in the program
-byte LooptimeDiag = 0;              // minimal feedback for checking efficiency: only feeds back looptime
+int Diagnostic = 0;                // switches on all kinds of diagnostic feedback from various locations in the program
+int LooptimeDiag = 0;              // minimal feedback for checking efficiency: only feeds back looptime
 int ArrayDiag = 0;                 // if switched on, prints all arrays every cycle
 unsigned long Slowdown = 0;                  // Delay value (ms) added to each loop, only in 'Diagnostic' mode to allow inspecting the data coming back over serial
 unsigned long msTable[8] = {0, 100, 200, 500, 1000, 1500, 2000, 5000}; //Delay values in ms to 'Slow Down' program for diagnostic purposes
-byte LoopIteration = 0;             // to track loop iterations
+int LoopIteration = 0;             // to track loop iterations
 
 // SERIAL- required for the core functionality of the Serial communication
 byte Mode = 0;
+byte PrevContMode = 0; //Previous Continuous Mode and Once Mode are temporarily stored,
+byte PrevOnceMode = 0; //If data turns out to be invalid, ContMode and OnceMode are restored to the previous version
 byte ContMode = 0;
 byte OnceMode = 0;
 byte DataLength = 0;
+int colorByte = 0;
 
 // HW control - Buttons!
 //ModeButton
@@ -91,7 +94,8 @@ byte ModeButtonState = 0;
 byte ModeLoopState = 1; // OnceModes are automatically set back to '0' at the end of the loop. Thi is to carry over the previous mode to be able to iterate through ONceMOdes
 unsigned long ModeButtonLastClick = 0;
 unsigned long ButtonClickTimer = 700; //once a button click is read, it's ignored for ButtenClickTimer ms
-byte ButtonModeTable[10] = { 4, 1, 3, 4, 5, 10, 11, 12, 13, 14 }; // determines which presets, and in what order are cycled
+byte ButtonModeTable[10] = { 1, 2, 0, 0, 0}; // determines which presets, and in what order are cycled
+byte ButtonModeCONTTable[10] = { 0, 0, 106, 101, 105}; // determines which presets, and in what order are cycled
 //ColorButton
 const int ColorButtonPin = 5;     // middle button the number of the pushbutton pin
 byte ColorButtonState = 0;
@@ -203,7 +207,7 @@ byte STATE30[nLEDs * 3] = {
 };
 
 void setup() {
-    Serial.begin(9600);
+  Serial.begin(9600);
   pinMode(ArduinoLedPin, OUTPUT);
   pinMode(ModeButtonPin, INPUT);
   pinMode(ColorButtonPin, INPUT);
@@ -226,7 +230,8 @@ void setup() {
     delay(10);
     strip.show();              // Refresh LED states
   }
-
+byte ModeButtonState = 1;
+OnceMode = 2;
 }
 
 //**********************************************************
@@ -259,27 +264,30 @@ void loop()
     ModeButtonState = digitalRead(ModeButtonPin) ;
 
     if (ModeButtonState) {
+      ContLoopIteration = 0;
       ModeLoopState++ ;
-      if (ModeLoopState > 9) {
+      if (ModeLoopState > 4) {
         ModeLoopState = 0;
       }
-      Mode = ButtonModeTable[ModeLoopState];
-      SetMode(Mode);
+      OnceMode = ButtonModeTable[ModeLoopState];
+      ContMode = ButtonModeCONTTable[ModeLoopState];
       ModeButtonLastClick = currentMillis ;
     }
   }
-
-  ///OFF Button
+  
+///OFF Button
   if ( (currentMillis - Button3LastClick) > ButtonClickTimer) {
     if (Diagnostic == 1) {                  //Diag
       Serial.println(F("[ entering Button3loop"));
     }
     Button3State = digitalRead(Button3Pin) ;
+
     if (Button3State) {
-      SetMode(1);
+      OnceMode = 1;
       ModeButtonLastClick = currentMillis ;
     }
   }
+  
   // END Button reading
 
   BytesInBuffer = Serial.available();
@@ -287,10 +295,10 @@ void loop()
   Serial.println(BytesInBuffer);
   if (BytesInBuffer == 0) {
     DiscardedBytes = 0;
-  }  // if data does not start with '255', it is invalid, discarded, and the next loop looks again for '255'. 'DiscardedBytes' keeps track of how many loops have thrown away 1 Byte. once there is nothing left in the buffer it is reset, so the next is counted separately
+  }
 
-  // Start reading in data once 3 Bytes of data have arrived
-  if (BytesInBuffer > 2)
+  // Start when data arrived
+  if (BytesInBuffer > 2) // all messages are minimum 3 Bytes so are waiting for 3 before getting going.
   {
     if (Serial.read() == 255)
 
@@ -300,11 +308,20 @@ void loop()
       if (Diagnostic == 1) {                    //Diag
         Serial.println(F("Entered reading section, ergo >=3 Bytes in buffer, first is 255"));
       }                                        //Diag
-      byte PrevMode = Mode;//If the read data turns out to be invalid, the previous Mode is saved here, and restored at the end of the read loop
+      PrevContMode = ContMode; //before reading in the mode, backing up the previous modes
+      PrevOnceMode = OnceMode;
 
       Mode = Serial.read();
       DataLength = Serial.read();
       BytesInBuffer = Serial.available();
+
+      if (Mode > 99) {
+        ContMode = Mode;
+      }
+      if (Mode < 100) {
+        OnceMode = Mode;
+        ContMode = 0;
+      }
 
       if (Diagnostic == 1) {                     //Diag
         Serial.print(F("[ Mode: "));             //Diag
@@ -324,11 +341,10 @@ void loop()
         if (Diagnostic == 1) {
           Serial.println("[ Entering 'NOT ENOUGH BYTES");
         }
-        unsigned long WaitedForBytes = 0;      //how long we've been waiting for the required bytes to arrive. Used to break out of this loop when Bytes don't arrive within CommsTimeout
+        WaitedForBytes = 0;
         unsigned long StartMillis = millis();
 
         while ( (BytesInBuffer < DataLength) && (WaitedForBytes < CommsTimeout )) {
-          // **** THIS IS THE **WAIT-FOR-BYTES** LOOP, WAITING FOR 'DataLength' BYTES TO ARRIVE FROM SERIAL PORT ***
           BytesInBuffer = Serial.available();
 
           if (Diagnostic == 1) {                      //Diag
@@ -342,8 +358,8 @@ void loop()
             Serial.println(WaitedForBytes);
           }
           WaitedForBytes = (millis() - StartMillis);
-        }/// End of **WAIT-FOR-BYTES** loop. Now there are 2 options: either the bytes arrived, or they didn't and the thing timed out
-
+        }
+        /// End of while loop. Now there are 2 options: either the bytes arrived, or they didn't and the thing timed out
         if (BytesInBuffer == DataLength) {
           if (Diagnostic == 1) {                                 //Diag
             Serial.print(F("[ Bytes arrived after waiting for ")); //Diag
@@ -360,7 +376,8 @@ void loop()
           Serial.println("ms, Aborting read operation, dumping data");
           char dump[BytesInBuffer];
           Serial.readBytes(dump, BytesInBuffer);
-          Mode = PrevMode; //restoring the previous modes so operation continues unchanged despite the invalid data
+          ContMode = PrevContMode; //restoring the previous modes so operation continues unchanged despite the invalid data
+          OnceMode = PrevOnceMode ;
         }
 
       } // End of 'not enough Bytes'
@@ -375,7 +392,8 @@ void loop()
         Serial.println(" too many Bytes in buffer. Dumping all data, not doing anything");
         char dump[BytesInBuffer];
         Serial.readBytes(dump, BytesInBuffer);
-        Mode = Mode; //restoring the previous modes so operation continues unchanged despite the invalid data
+        ContMode = PrevContMode; //restoring the previous modes so operation continues unchanged despite the invalid data
+        OnceMode = PrevOnceMode ;
       }
 
     }
@@ -386,9 +404,8 @@ void loop()
       Serial.print("[ ERROR: Bytes received not starting with '255' Discarded: ");
       Serial.println(DiscardedBytes);
     } //End invalid data section (ie data did not start with '255' and is non-255 byte is discarded. The rest is left intact in case it is the start of a valid message)
-    SetMode(Mode);
-
   } // End reading / discarding data section which only runs when there are 3 Bytes or ore in the buffer
+
 
 
   ////// BRIDGE section, between validating the incoming data, and reading in the data (if valid)
@@ -409,7 +426,7 @@ void loop()
 
 
   switch (OnceMode) {
-    case 1: //All Off
+    case 1: //All off
       {
         for (int i = 0; i < strip.numPixels(); i++) {
           strip.setPixelColor(i, 0); // Erase pixel, but don't refresh!
@@ -418,10 +435,10 @@ void loop()
         OnceMode = 0;      // Refresh LED states
         break;
       }
-    case 2: //All RED
+    case 2: //All SELECTED GREEN SHADE FOR AMBIENTATION
       {
         for (int i = 0; i < strip.numPixels(); i++) {
-          strip.setPixelColor(i, strip.Color(255, 255, 255)); // Erase pixel, but don't refresh!
+          strip.setPixelColor(i, strip.Color(102, 224, 0)); // Erase pixel, but don't refresh!
         }
         strip.show();
         OnceMode = 0;      // Refresh LED states
@@ -554,7 +571,25 @@ void loop()
         OnceMode = 0;
         break;
       }
-
+    case 99: //Mode 99 is CONFIG. Bytes set: Diagnostic, Delay
+      {
+        Diagnostic = Serial.read();
+        int i = Serial.read();
+        Slowdown = msTable[i];
+        LooptimeDiag = Serial.read();
+        ArrayDiag = Serial.read();
+        CommsTimeout = msTable[Serial.read()];
+        if (Diagnostic == 1) {
+          Serial.print("[ Diagnostic set to: ");
+          Serial.println(Diagnostic);
+          Serial.print("[ Slowdown set to: ");
+          Serial.println(Slowdown);
+          Serial.print("[ CommsTimeout set to: ");
+          Serial.println(CommsTimeout);
+        }
+        OnceMode = 0;
+        break;
+      }
 
     default:
       if (Diagnostic == 1) {
@@ -619,17 +654,27 @@ void loop()
         if (Diagnostic == 1) {
           Serial.println("[ Continuous Mode 1 - fill in details later");
         }
+        // newrainbow(5);
         rainbow(40);
 
         break;
       }
 
-    case 106:
-      {
+    case 106: /// TEST MOVING GREEN
+    {
         if (Diagnostic == 1) {
           Serial.println("[ Continuous Mode 1 - fill in details later");
         }
-        fader(200);
+     
+        
+        for (int i = 0; i < 22; i++) {
+          int rnd1 = random (-1,1);
+          int rnd2 = random (-1,1);
+          int rnd3 = random (-1,1);
+          strip.setPixelColor(i, strip.Color(102+rnd1, 224+rnd2, 0+rnd3)); // Erase pixel, but don't refresh!
+        }
+        strip.show();
+        delay (200);
 
         break;
       }
@@ -680,6 +725,24 @@ void loop()
 
         break;
       }
+      case 121:
+      {
+        if (Diagnostic == 1) {
+          Serial.println("[ Continuous Mode 1 - fill in details later");
+        }
+        newrainbowCycle(0);
+
+        break;
+      }
+      case 1215:
+      {
+        if (Diagnostic == 1) {
+          Serial.println("[ Continuous Mode 1 - fill in details later");
+        }
+        newrainbowCycle(400);
+
+        break;
+      }
 
     default:
       if (Diagnostic == 1) {
@@ -718,69 +781,7 @@ void loop()
 } //End main loop
 
 
-//*****************************************************************
 //*************       F U N C T I O N S      **********************
-//*****************************************************************
-// *** PROGRAM RUNNING FUNCTIONS
-
-// Blink ArduinoLED to show program is running. Toggles On/Off every loop
-void LoopBlink(int Loop)
-{
-  if (Loop % 2)
-  {
-    digitalWrite(ArduinoLedPin, HIGH);
-  }
-  else
-  {
-    digitalWrite(ArduinoLedPin, LOW);
-  }
-}// End blinkLed
-
-// PrintArrayToSerial: A diagnostic printing out full arrays to the serial port
-void ArrayToSerial(byte Array[], int N) {
-  for (int i = 0; i < N ; i++)
-  {
-    Serial.print(" ");
-    Serial.print(Array[i], DEC);
-    Serial.print(" ");
-  }
-  Serial.println("");
-} // END PrintArrayToSerial
-
-void SetDiagnostic() //Mode 99 is CONFIG. Bytes set: Diagnostic, Delay
-{
-  Diagnostic = Serial.read();
-  int i = Serial.read();
-  Slowdown = msTable[i];
-  LooptimeDiag = Serial.read();
-  ArrayDiag = Serial.read();
-  CommsTimeout = msTable[Serial.read()];
-  if (Diagnostic == 1) {
-    Serial.print("[ Diagnostic set to: ");
-    Serial.println(Diagnostic);
-    Serial.print("[ Slowdown set to: ");
-    Serial.println(Slowdown);
-    Serial.print("[ CommsTimeout set to: ");
-    Serial.println(CommsTimeout);
-  }
-} // END SetDiagnostic
-
-
-void SetMode(byte inputmode)
-{
-  if (inputmode > 99) {
-    ContMode = inputmode;
-  }
-  if (inputmode < 99) {
-    OnceMode = inputmode;
-    ContMode = 0;
-  }
-  if (inputmode = 99) {
-    SetDiagnostic;
-  }
-} //END SetMode
-
-// ********** LED SETTING AND EFFECT FUNCTIONS*******
 
 // Array to NeoPixels
 void ArrayToPixels(byte Array[], int N) {
@@ -795,58 +796,106 @@ void ArrayToPixels(byte Array[], int N) {
   }
 }
 
-/*
-// Fill the dots one after the other with a color
-void colorWipe(uint32_t c, uint8_t wait) {
-  if (!LoopDelayCounter) {
-    ContCurrentStep +=1;
-   if (ContCurrentStep = strip.numPixels) {ContCurrentStep = 0;}
-      strip.setPixelColor(ContCurrentStep, c);
-      strip.show();
-    }
+// PrintArrayToSerial
+void ArrayToSerial(byte Array[], int N) {
+  for (int i = 0; i < N ; i++)
+  {
+    Serial.print(" ");
+    Serial.print(Array[i], DEC);
+    Serial.print(" ");
+  }
+  Serial.println("");
+}
 
-  LoopDelayCounter++ ;
-  if (LoopDelayCounter > wait) {
-    LoopDelayCounter = 0;
+// Blink ArduinoLED to show program is running. Toggles On/Off every loop
+void LoopBlink(int Loop)
+{
+  if (LoopIteration % 2)
+  {
+    digitalWrite(ArduinoLedPin, HIGH);
+  }
+  else
+  {
+    digitalWrite(ArduinoLedPin, LOW);
   }
 }
-*/
+// End blinkLed
+
+// Fill the dots one after the other with a color
+void colorWipe(uint32_t c, uint8_t wait) {
+  for (uint16_t i = 0; i < strip.numPixels(); i++) {
+    strip.setPixelColor(i, c);
+    strip.show();
+    delay(wait);
+  }
+}
 
 //
 void rainbow(uint8_t wait) {
   uint16_t i, j;
-  if (!LoopDelayCounter) {
-    for (j = 0; j < 256; j++) {
-      for (i = 0; i < strip.numPixels(); i++) {
-        strip.setPixelColor(i, Wheel((i + j) & 255));
-      }
-      strip.show();
+
+
+  for (j = 0; j < 256; j++) {
+    for (i = 0; i < strip.numPixels(); i++) {
+      strip.setPixelColor(i, Wheel((i + j) & 255));
     }
-  }
-  LoopDelayCounter++;
-  if (LoopDelayCounter > wait) {
-    LoopDelayCounter = 0;
+    strip.show();
+    delay(wait);
+
   }
 }
 
 
+void newrainbow(uint8_t wait) {
+  uint16_t i, j;
+// Serial.print("Loopiteration at start: 
+
+
+if (!ContLoopIteration){
+  for (j = 0; j < 256; j++) {
+    for (i = 0; i < strip.numPixels(); i++) {
+      strip.setPixelColor(i, Wheel((i + j) & 255));
+    }
+    strip.show();}
+    ContLoopIteration++;
+      if (ContLoopIteration > wait) {ContLoopIteration=0;}
+      
+
+  }
+}
+
 // Slightly different, this makes the rainbow equally distributed throughout
 void rainbowCycle(uint8_t wait) {
   uint16_t i, j;
-
-  if (!LoopDelayCounter) {
-    for (j = 0; j < 256 * 5; j++) { // 5 cycles of all colors on wheel
-      for (i = 0; i < strip.numPixels(); i++) {
-        strip.setPixelColor(i, Wheel(((i * 256 / strip.numPixels()) + j) & 255));
-      }
-      strip.show();
+  
+  if (!ContLoopIteration){
+  for (j = 0; j < 256 * 5; j++) { // 5 cycles of all colors on wheel
+    for (i = 0; i < strip.numPixels(); i++) {
+      strip.setPixelColor(i, Wheel(((i * 256 / strip.numPixels()) + j) & 255));
     }
-
-    LoopDelayCounter++;
-    if (LoopDelayCounter > wait) {
-      LoopDelayCounter = 0;
-    }
+    strip.show();}
+    
+    ContLoopIteration++;
+      if (ContLoopIteration > wait) {ContLoopIteration=0;}
   }
+}
+
+// Slightly different, this makes the rainbow equally distributed throughout with delaytric
+void newrainbowCycle(uint8_t wait) {
+  uint16_t i, j;
+  
+  if (!ContLoopIteration){
+    ContCurrentStep +=1;
+    if (ContCurrentStep > 256 * 5) {ContCurrentStep = 0;}
+   // 5 cycles of all colors on wheel
+    for (i = 0; i < strip.numPixels(); i++) {
+      strip.setPixelColor(i, Wheel(((i * 256 / strip.numPixels()) + ContCurrentStep) & 255));
+    }
+    strip.show();}
+    
+    ContLoopIteration++;
+    if (ContLoopIteration > wait) {ContLoopIteration=0;}
+  
 }
 
 //Theatre-style crawling lights.
@@ -909,8 +958,8 @@ void blinker(uint8_t cycletime) {
   // previousMillis
 
   if ((millis() - ContLoopMillis) > cycletime)
-  { LoopDelayCounter++ ;
-    if (LoopDelayCounter % 2) {
+  { ContLoopIteration++ ;
+    if (ContLoopIteration % 2) {
       for (int i = 0; i < strip.numPixels(); i++) {
         strip.setPixelColor(i, strip.Color(255, 255, 255)); // Erase pixel, but don't refresh!
       }
@@ -931,7 +980,7 @@ void blinker(uint8_t cycletime) {
 // FADER
 void fader(uint32_t cycletime) {
 
-  int stepsize = constrain ( map ( (millis() - ContLoopMillis), 0, cycletime , 0, 255) , 0, 255);
+  int stepsize = constrain ( map ( (millis() - ContLoopMillis), 0, cycletime , 0, 255) ,0,255);
   if (stepsize) {
     ContLoopMillis = millis(); // if the stepsize = 0 (ie the change is superslow and LEDs don't need to be updated
   }
@@ -964,6 +1013,7 @@ void fader(uint32_t cycletime) {
     ContLoopMillis = millis(); // if the stepsize = 0 (ie the change is superslow and LEDs don't need to be updated every cycle, keep counting time
   }
 }
+
 
 
 

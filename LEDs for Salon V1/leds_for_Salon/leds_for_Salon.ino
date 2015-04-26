@@ -89,21 +89,22 @@ int colorByte = 0;
 
 // HW control - Buttons!
 //ModeButton
-const int ModeButtonPin = 5;     // the number of the pushbutton pin
-int ModeButtonState = 0;
-int ModeLoopState = 1; // OnceModes are automatically set back to '0' at the end of the loop. Thi is to carry over the previous mode to be able to iterate through ONceMOdes
+const int ModeButtonPin = 7;     // RED is pin 7 the number of the pushbutton pin button
+byte ModeButtonState = 0;
+byte ModeLoopState = 1; // OnceModes are automatically set back to '0' at the end of the loop. Thi is to carry over the previous mode to be able to iterate through ONceMOdes
 unsigned long ModeButtonLastClick = 0;
 unsigned long ButtonClickTimer = 700; //once a button click is read, it's ignored for ButtenClickTimer ms
-int ButtonModeTable[10] = { 4, 1, 3, 4, 5, 10, 11, 12, 13, 14 }; // determines which presets, and in what order are cycled
+byte ButtonModeTable[10] = { 2, 4, 0, 0, 0}; // determines which presets, and in what order are cycled
+byte ButtonModeCONTTable[10] = { 0, 0, 106, 101, 105}; // determines which presets, and in what order are cycled
 //ColorButton
-const int ColorButtonPin = 6;     // the number of the pushbutton pin
-int ColorButtonState = 0;
-int ColorButtonLoopState = 1;
+const int ColorButtonPin = 5;     // middle button the number of the pushbutton pin
+byte ColorButtonState = 0;
+byte ColorButtonLoopState = 1;
 unsigned long ColorButtonLastClick = 0;
 //Button3
-const int Button3Pin = 7;     // the number of the pushbutton pin
-int Button3State = 0;
-int Button3LoopState = 1; // OnceModes are automatically set back to '0' at the end of the loop. Thi is to carry over the previous mode to be able to iterate through ONceMOdes
+const int Button3Pin = 6;     // the number of the pushbutton pin
+byte Button3State = 0;
+byte Button3LoopState = 1; // OnceModes are automatically set back to '0' at the end of the loop. Thi is to carry over the previous mode to be able to iterate through ONceMOdes
 unsigned long Button3LastClick = 0;
 
 
@@ -262,14 +263,30 @@ void loop()
     ModeButtonState = digitalRead(ModeButtonPin) ;
 
     if (ModeButtonState) {
+      ContLoopIteration = 0;
       ModeLoopState++ ;
-      if (ModeLoopState > 9) {
+      if (ModeLoopState > 4) {
         ModeLoopState = 0;
       }
       OnceMode = ButtonModeTable[ModeLoopState];
+      ContMode = ButtonModeCONTTable[ModeLoopState];
       ModeButtonLastClick = currentMillis ;
     }
   }
+  
+///OFF Button
+  if ( (currentMillis - Button3LastClick) > ButtonClickTimer) {
+    if (Diagnostic == 1) {                  //Diag
+      Serial.println(F("[ entering Button3loop"));
+    }
+    Button3State = digitalRead(Button3Pin) ;
+
+    if (Button3State) {
+      OnceMode = 1;
+      ModeButtonLastClick = currentMillis ;
+    }
+  }
+  
   // END Button reading
 
   BytesInBuffer = Serial.available();
@@ -408,7 +425,7 @@ void loop()
 
 
   switch (OnceMode) {
-    case 1: //All Off
+    case 1: //All off
       {
         for (int i = 0; i < strip.numPixels(); i++) {
           strip.setPixelColor(i, 0); // Erase pixel, but don't refresh!
@@ -417,10 +434,10 @@ void loop()
         OnceMode = 0;      // Refresh LED states
         break;
       }
-    case 2: //All RED
+    case 2: //All SELECT GREEN
       {
         for (int i = 0; i < strip.numPixels(); i++) {
-          strip.setPixelColor(i, strip.Color(255, 255, 255)); // Erase pixel, but don't refresh!
+          strip.setPixelColor(i, strip.Color(102, 224, 0)); // Erase pixel, but don't refresh!
         }
         strip.show();
         OnceMode = 0;      // Refresh LED states
@@ -641,12 +658,17 @@ void loop()
         break;
       }
 
-    case 106:
-      {
+    case 106: /// TEST MOVING GREEN
+    {
         if (Diagnostic == 1) {
           Serial.println("[ Continuous Mode 1 - fill in details later");
         }
-        fader(200);
+        
+        int rnd = random (0,5);
+        for (int i = 0; i < 22; i++) {
+          strip.setPixelColor(i, strip.Color(102, 224, 0)); // Erase pixel, but don't refresh!
+        }
+        strip.show();
 
         break;
       }
