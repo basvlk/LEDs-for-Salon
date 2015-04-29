@@ -69,12 +69,13 @@ unsigned long ContLoopMillis = 0;  // will store last time at the end of the pre
 byte LoopDelayCounter = 0; // allows to skip a number of loopcycles in Cont Modes.
 byte ContCurrentStep = 0; //For iterations in Cont Loops, to keep the 'current step' and add +1 each time the loop runs
 byte invert = 1; // allows for fade in to turn to fadeout
+byte ContLoopIteration = 0;
 
 //DIAGNOSTIC TOOLS
-byte Diagnostic = 0;                // switches on all kinds of diagnostic feedback from various locations in the program
+byte Diagnostic = 1;                // switches on all kinds of diagnostic feedback from various locations in the program
 byte LooptimeDiag = 0;              // minimal feedback for checking efficiency: only feeds back looptime
 int ArrayDiag = 0;                 // if switched on, prints all arrays every cycle
-unsigned long Slowdown = 0;                  // Delay value (ms) added to each loop, only in 'Diagnostic' mode to allow inspecting the data coming back over serial
+unsigned long Slowdown = 500;                  // Delay value (ms) added to each loop, only in 'Diagnostic' mode to allow inspecting the data coming back over serial
 unsigned long msTable[8] = {0, 100, 200, 500, 1000, 1500, 2000, 5000}; //Delay values in ms to 'Slow Down' program for diagnostic purposes
 byte LoopIteration = 0;             // to track loop iterations
 
@@ -91,7 +92,7 @@ byte ModeButtonState = 0;
 byte ModeLoopState = 1; // OnceModes are automatically set back to '0' at the end of the loop. Thi is to carry over the previous mode to be able to iterate through ONceMOdes
 unsigned long ModeButtonLastClick = 0;
 unsigned long ButtonClickTimer = 700; //once a button click is read, it's ignored for ButtenClickTimer ms
-byte ButtonModeTable[10] = { 4, 1, 3, 4, 5, 10, 11, 12, 13, 14 }; // determines which presets, and in what order are cycled
+byte ButtonModeTable[10] = { 4, 101, 3, 4, 5, 10, 11, 12, 13, 14 }; // determines which presets, and in what order are cycled
 //ColorButton
 const int ColorButtonPin = 5;     // middle button the number of the pushbutton pin
 byte ColorButtonState = 0;
@@ -298,7 +299,7 @@ void loop()
 
     { // SECTION 1: MODE and LENGTH
       if (Diagnostic == 1) {                    //Diag
-        Serial.println(F("Entered reading section, ergo >=3 Bytes in buffer, first is 255"));
+        Serial.println(F("[ Entered reading section, ergo >=3 Bytes in buffer, first is 255"));
       }                                        //Diag
       byte PrevMode = Mode;//If the read data turns out to be invalid, the previous Mode is saved here, and restored at the end of the read loop
 
@@ -375,7 +376,7 @@ void loop()
         Serial.println(" too many Bytes in buffer. Dumping all data, not doing anything");
         char dump[BytesInBuffer];
         Serial.readBytes(dump, BytesInBuffer);
-        Mode = Mode; //restoring the previous modes so operation continues unchanged despite the invalid data
+        Mode = PrevMode; //restoring the previous modes so operation continues unchanged despite the invalid data
       }
 
     }
@@ -749,20 +750,20 @@ void ArrayToSerial(byte Array[], int N) {
 
 void SetDiagnostic() //Mode 99 is CONFIG. Bytes set: Diagnostic, Delay
 {
+  Serial.println("[ Entering Diagnostic change");
   Diagnostic = Serial.read();
   int i = Serial.read();
   Slowdown = msTable[i];
   LooptimeDiag = Serial.read();
   ArrayDiag = Serial.read();
   CommsTimeout = msTable[Serial.read()];
-  if (Diagnostic == 1) {
     Serial.print("[ Diagnostic set to: ");
     Serial.println(Diagnostic);
     Serial.print("[ Slowdown set to: ");
     Serial.println(Slowdown);
     Serial.print("[ CommsTimeout set to: ");
     Serial.println(CommsTimeout);
-  }
+  
 } // END SetDiagnostic
 
 
@@ -776,7 +777,7 @@ void SetMode(byte inputmode)
     ContMode = 0;
   }
   if (inputmode = 99) {
-    SetDiagnostic;
+    SetDiagnostic();
   }
 } //END SetMode
 
@@ -829,6 +830,25 @@ void rainbow(uint8_t wait) {
   }
 }
 
+/// attempting better timing:
+void newrainbow(uint8_t wait) {
+  uint16_t i, j;
+// Serial.print("Loopiteration at start: 
+
+
+if (!ContLoopIteration){
+  for (j = 0; j < 256; j++) {
+    for (i = 0; i < strip.numPixels(); i++) {
+      strip.setPixelColor(i, Wheel((i + j) & 255));
+    }
+    strip.show();}
+    ContLoopIteration++;
+      if (ContLoopIteration > wait) {ContLoopIteration=0;}
+      
+
+  }
+}
+
 
 // Slightly different, this makes the rainbow equally distributed throughout
 void rainbowCycle(uint8_t wait) {
@@ -847,6 +867,24 @@ void rainbowCycle(uint8_t wait) {
       LoopDelayCounter = 0;
     }
   }
+}
+
+// trying with corrected timgin 
+void newrainbowCycle(uint8_t wait) {
+  uint16_t i, j;
+  
+  if (!ContLoopIteration){
+    ContCurrentStep +=1;
+    if (ContCurrentStep > 256 * 5) {ContCurrentStep = 0;}
+   // 5 cycles of all colors on wheel
+    for (i = 0; i < strip.numPixels(); i++) {
+      strip.setPixelColor(i, Wheel(((i * 256 / strip.numPixels()) + ContCurrentStep) & 255));
+    }
+    strip.show();}
+    
+    ContLoopIteration++;
+    if (ContLoopIteration > wait) {ContLoopIteration=0;}
+  
 }
 
 //Theatre-style crawling lights.
