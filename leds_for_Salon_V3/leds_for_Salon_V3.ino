@@ -97,6 +97,8 @@ byte ButtonModeTable[10] = { 10, 11, 12, 13, 14, 15, 16, 101, 102 }; // determin
 const int ColorButtonPin = 5;     // middle button the number of the pushbutton pin
 byte ColorButtonState = 0;
 byte ColorButtonLoopState = 1;
+byte ColorLoopState = 1;
+byte ColorModeTable[10] = { 10, 11, 12, 13, 14, 15, 16, 101, 102 }; // determines which presets, and in what order are cycled
 unsigned long ColorButtonLastClick = 0;
 //Button3
 const int Button3Pin = 6;     // the number of the pushbutton pin
@@ -270,21 +272,21 @@ void loop()
       ModeButtonLastClick = currentMillis ;
     }
   }
-  // Dynamic Button
-  if ( (currentMillis - ModeButtonLastClick) > ButtonClickTimer) {
+  // Color Button
+  if ( (currentMillis - ColorButtonLastClick) > ButtonClickTimer) {
     if (Diagnostic == 1) {                  //Diag
-      Serial.println(F("[ entering Buttonloop"));
+      Serial.println(F("[ entering ColorButtonloop"));
     }
-    ModeButtonState = digitalRead(ModeButtonPin) ;
+    ColorButtonState = digitalRead(ColorButtonPin) ;
 
-    if (ModeButtonState) {
-      ModeLoopState++ ;
-      if (ModeLoopState > 8) {
-        ModeLoopState = 0;
+    if (ColorButtonState) {
+      ColorLoopState++ ;
+      if (ColorLoopState > 8) {
+        ColorLoopState = 0;
       }
-      Mode = ButtonModeTable[ModeLoopState];
+      Mode = ColorModeTable[ColorLoopState];
       SetMode(Mode);
-      ModeButtonLastClick = currentMillis ;
+      ColorButtonLastClick = currentMillis ;
     }
   }
   
