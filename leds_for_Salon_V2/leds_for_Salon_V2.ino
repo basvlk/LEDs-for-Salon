@@ -72,7 +72,7 @@ byte invert = 1; // allows for fade in to turn to fadeout
 byte ContLoopIteration = 0;
 
 //DIAGNOSTIC TOOLS
-byte Diagnostic = 0;                // switches on all kinds of diagnostic feedback from various locations in the program
+byte Diagnostic = 1;                // switches on all kinds of diagnostic feedback from various locations in the program
 byte LooptimeDiag = 0;              // minimal feedback for checking efficiency: only feeds back looptime
 int ArrayDiag = 0;                 // if switched on, prints all arrays every cycle
 unsigned long Slowdown = 0;                  // Delay value (ms) added to each loop, only in 'Diagnostic' mode to allow inspecting the data coming back over serial
@@ -92,7 +92,7 @@ byte ModeButtonState = 0;
 byte ModeLoopState = 1; // OnceModes are automatically set back to '0' at the end of the loop. Thi is to carry over the previous mode to be able to iterate through ONceMOdes
 unsigned long ModeButtonLastClick = 0;
 unsigned long ButtonClickTimer = 700; //once a button click is read, it's ignored for ButtenClickTimer ms
-byte ButtonModeTable[10] = { 4, 101, 3, 102, 5, 10, 11, 12, 13, 14 }; // determines which presets, and in what order are cycled
+byte ButtonModeTable[10] = { 10, 11, 12, 13, 14, 15, 16, 101, 102, 3 }; // determines which presets, and in what order are cycled
 //ColorButton
 const int ColorButtonPin = 5;     // middle button the number of the pushbutton pin
 byte ColorButtonState = 0;
@@ -477,46 +477,70 @@ void loop()
         OnceMode = 0;
         break;
       }
-    case 10:
+    case 10: //Salon Green
       {
-        Serial.readBytes((char *)STATE10, DataLength);
-        ArrayToPixels(STATE10, nLEDs * 3);
-        OnceMode = 0;
+        
+        for (int i = 0; i < strip.numPixels(); i++) {
+          strip.setPixelColor(i, strip.Color(102, 224, 0)); // Erase pixel, but don't refresh!
+        }
+        strip.show();
+        OnceMode = 0;      // Refresh LED states
         break;
       }
-    case 11:
+    case 11: // Happy Pink (157, 0, 152)
       {
-        Serial.readBytes((char *)STATE11, DataLength);
-        ArrayToPixels(STATE11, nLEDs * 3);
-        OnceMode = 0;
+        
+        for (int i = 0; i < strip.numPixels(); i++) {
+          strip.setPixelColor(i, strip.Color(157, 0, 152)); // Erase pixel, but don't refresh!
+        }
+        strip.show();
+        OnceMode = 0;      // Refresh LED states
         break;
       }
-    case 12:
+    case 12: // Dark Purple (28, 0, 20)
       {
-        Serial.readBytes((char *)STATE12, DataLength);
-        ArrayToPixels(STATE12, nLEDs * 3);
-        OnceMode = 0;
+        
+        for (int i = 0; i < strip.numPixels(); i++) {
+          strip.setPixelColor(i, strip.Color(28, 0, 20)); // Erase pixel, but don't refresh!
+        }
+        strip.show();
+        OnceMode = 0;      // Refresh LED states
         break;
       }
-    case 13:
+    case 13: // Gold (179, 151, 0)
       {
-        Serial.readBytes((char *)STATE13, DataLength);
-        ArrayToPixels(STATE13, nLEDs * 3);
-        OnceMode = 0;
+        for (int i = 0; i < strip.numPixels(); i++) {
+          strip.setPixelColor(i, strip.Color(179, 151, 0)); // Erase pixel, but don't refresh!
+        }
+        strip.show();
+        OnceMode = 0;      // Refresh LED states
         break;
       }
-    case 14:
+    case 14: //Celeste
       {
-        Serial.readBytes((char *)STATE14, DataLength);
-        ArrayToPixels(STATE14, nLEDs * 3);
-        OnceMode = 0;
+        for (int i = 0; i < strip.numPixels(); i++) {
+          strip.setPixelColor(i, strip.Color(24, 248, 255)); // Erase pixel, but don't refresh!
+        }
+        strip.show();
+        OnceMode = 0;      // Refresh LED states
         break;
       }
-    case 15:
+    case 15: // Turquoise
       {
-        Serial.readBytes((char *)STATE15, DataLength);
-        ArrayToPixels(STATE15, nLEDs * 3);
-        OnceMode = 0;
+        for (int i = 0; i < strip.numPixels(); i++) {
+          strip.setPixelColor(i, strip.Color(0, 124, 112)); // Erase pixel, but don't refresh!
+        }
+        strip.show();
+        OnceMode = 0;      // Refresh LED states
+        break;
+      }
+          case 16: // AquaMarine
+      {
+        for (int i = 0; i < strip.numPixels(); i++) {
+          strip.setPixelColor(i, strip.Color(0, 126, 53)); // Erase pixel, but don't refresh!
+        }
+        strip.show();
+        OnceMode = 0;      // Refresh LED states
         break;
       }
     case 20:
@@ -581,9 +605,10 @@ void loop()
     case 101:
       {
         if (Diagnostic == 1) {
-          Serial.println("[ Continuous Mode 1 - fill in details later");
+          Serial.println("[ Continuous Mode 1 - medium rainbowcycle");
         }
-        newrainbowCycle(10);
+ //       newrainbowCycle(10);
+        rainbowCycle(10);
 
         break;
       }
@@ -591,9 +616,10 @@ void loop()
     case 102:
       {
         if (Diagnostic == 1) {
-          Serial.println("[ Continuous Mode 1 - fill in details later");
+          Serial.println("[ Continuous Mode 2 - slow rainbowcycle");
         }
-        rainbowCycle(2);
+  //      rainbowCycle(2);
+                rainbowCycle(100);
 
         break;
       }
