@@ -82,7 +82,7 @@ byte LoopIteration = 0;             // to track loop iterations
 // SERIAL- required for the core functionality of the Serial communication
 byte Mode = 0;
 byte ContMode = 0;
-byte OnceMode = 0;
+byte OnceMode = 2;
 byte DataLength = 0;
 
 // HW control - Buttons!
@@ -92,7 +92,7 @@ byte ModeButtonState = 0;
 byte ModeLoopState = 1; // OnceModes are automatically set back to '0' at the end of the loop. Thi is to carry over the previous mode to be able to iterate through ONceMOdes
 unsigned long ModeButtonLastClick = 0;
 unsigned long ButtonClickTimer = 700; //once a button click is read, it's ignored for ButtenClickTimer ms
-byte ButtonModeTable[10] = { 4, 101, 3, 102, 5, 10, 11, 12, 13, 14 }; // determines which presets, and in what order are cycled
+byte ButtonModeTable[10] = { 4, 101, 3, 4, 5, 10, 11, 12, 13, 14 }; // determines which presets, and in what order are cycled
 //ColorButton
 const int ColorButtonPin = 5;     // middle button the number of the pushbutton pin
 byte ColorButtonState = 0;
@@ -107,6 +107,8 @@ unsigned long Button3LastClick = 0;
 
 
 // PRESETS - The following arrays form Presets for 10 LEDs: They are 10x3 long - patterns are repeated every 10 LEDs
+
+
 byte STATEX[30] = {
   0, 10, 0, 0, 0, 10, 10, 10, 10, 10, 0, 0, 0, 10, 0, 0, 0, 10, 10, 10, 10, 10, 0, 0, 10, 0, 0, 10, 0, 0,
 };
@@ -117,6 +119,8 @@ byte STATE10[nLEDs * 3] = {
   0, 48, 56, 43, 78, 0, 8, 74, 0, 0, 74, 25, 0, 85, 72, 0, 50, 86, 0, 11, 85, 31, 0, 83, 0, 48, 56, 43, 78, 0,
   0, 48, 56, 43, 78, 0, 8, 74, 0, 0, 74, 25, 0, 85, 72, 0, 50, 86, 0, 11, 85, 31, 0, 83, 0, 48, 56, 43, 78, 0,
 };
+
+/*
 byte STATE11[nLEDs * 3] = {
   105, 0, 71, 0, 3, 101, 0, 23, 67, 0, 153, 205, 0, 153, 205, 0, 23, 67, 0, 3, 101, 105, 0, 71, 105, 0, 71, 0, 3, 101,
   105, 0, 71, 0, 3, 101, 0, 23, 67, 0, 153, 205, 0, 153, 205, 0, 23, 67, 0, 3, 101, 105, 0, 71, 105, 0, 71, 0, 3, 101,
@@ -202,6 +206,7 @@ byte STATE29[nLEDs * 3] = {
 byte STATE30[nLEDs * 3] = {
   92, 117, 0, 23, 0, 102, 92, 117, 0, 23, 0, 102, 92, 117, 0, 23, 0, 102, 92, 117, 0, 23, 0, 102,
 };
+*/
 
 void setup() {
   Serial.begin(9600);
@@ -419,7 +424,7 @@ void loop()
         OnceMode = 0;      // Refresh LED states
         break;
       }
-    case 2: //All RED
+    case 2: //All WHITE
       {
         for (int i = 0; i < strip.numPixels(); i++) {
           strip.setPixelColor(i, strip.Color(255, 255, 255)); // Erase pixel, but don't refresh!
@@ -477,6 +482,8 @@ void loop()
         OnceMode = 0;
         break;
       }
+
+
     case 10:
       {
         Serial.readBytes((char *)STATE10, DataLength);
@@ -484,6 +491,7 @@ void loop()
         OnceMode = 0;
         break;
       }
+/*
     case 11:
       {
         Serial.readBytes((char *)STATE11, DataLength);
@@ -555,6 +563,7 @@ void loop()
         OnceMode = 0;
         break;
       }
+*/
 
 
     default:
@@ -578,12 +587,15 @@ void loop()
         }
         break;
       }
+      
+      
+      
     case 101:
       {
         if (Diagnostic == 1) {
           Serial.println("[ Continuous Mode 1 - fill in details later");
         }
-        newrainbowCycle(10);
+//        newrainbowCycle(10);
 
         break;
       }
@@ -593,94 +605,11 @@ void loop()
         if (Diagnostic == 1) {
           Serial.println("[ Continuous Mode 1 - fill in details later");
         }
-        rainbowCycle(2);
-
-        break;
-      }
-    case 103:
-      {
-        if (Diagnostic == 1) {
-          Serial.println("[ Continuous Mode 1 - fill in details later");
-        }
-        rainbow(5);
-
-        break;
-      }
-    case 104:
-      {
-        if (Diagnostic == 1) {
-          Serial.println("[ Continuous Mode 1 - fill in details later");
-        }
-        rainbow(20);
-
-        break;
-      }
-    case 105:
-      {
-        if (Diagnostic == 1) {
-          Serial.println("[ Continuous Mode 1 - fill in details later");
-        }
-        rainbow(40);
+//        rainbowCycle(2);
 
         break;
       }
 
-    case 106:
-      {
-        if (Diagnostic == 1) {
-          Serial.println("[ Continuous Mode 1 - fill in details later");
-        }
-        fader(200);
-
-        break;
-      }
-    case 107:
-      {
-        if (Diagnostic == 1) {
-          Serial.println("[ Continuous Mode 1 - fill in details later");
-        }
-        fader(1000);
-
-        break;
-      }
-
-    case 110:
-      {
-        if (Diagnostic == 1) {
-          Serial.println("[ Continuous Mode 1 - fill in details later");
-        }
-        fader(1000);
-
-        break;
-      }
-
-    case 111:
-      {
-        if (Diagnostic == 1) {
-          Serial.println("[ Continuous Mode 1 - fill in details later");
-        }
-        fader(500);
-
-        break;
-      }
-    case 112:
-      {
-        if (Diagnostic == 1) {
-          Serial.println("[ Continuous Mode 1 - fill in details later");
-        }
-        fader(30000);
-
-        break;
-      }
-    case 113:
-      {
-        if (Diagnostic == 1) {
-          Serial.println("[ Continuous Mode 1 - fill in details later");
-        }
-        fader(0);
-
-        break;
-      }
 
     default:
       if (Diagnostic == 1) {
@@ -697,6 +626,7 @@ void loop()
 
   if (ArrayDiag == 1)
   {
+    /*
     ArrayToSerial(STATEX, nLEDs * 3);
     ArrayToSerial(STATE10, nLEDs * 3);
     ArrayToSerial(STATE11, nLEDs * 3);
@@ -704,6 +634,7 @@ void loop()
     ArrayToSerial(STATE13, nLEDs * 3);
     ArrayToSerial(STATE14, nLEDs * 3);
     ArrayToSerial(STATE15, nLEDs * 3);
+    */
   }
   if (Diagnostic == 1) {
     Serial.print("[ **** END OF LOOP ");
@@ -813,6 +744,7 @@ void colorWipe(uint32_t c, uint8_t wait) {
 }
 */
 
+/*
 //
 void rainbow(uint8_t wait) {
   uint16_t i, j;
@@ -872,11 +804,11 @@ void rainbowCycle(uint8_t wait) {
 
 // trying with corrected timgin 
 void newrainbowCycle(uint8_t wait) {
-  uint16_t i;
+  uint16_t i, j;
   
   if (!ContLoopIteration){
     ContCurrentStep +=1;
-    if (ContCurrentStep > 255 * 5) {ContCurrentStep = 0; delay (200);}
+    if (ContCurrentStep > 256 * 5) {ContCurrentStep = 0;}
    // 5 cycles of all colors on wheel
     for (i = 0; i < strip.numPixels(); i++) {
       strip.setPixelColor(i, Wheel(((i * 256 / strip.numPixels()) + ContCurrentStep) & 255));
@@ -1003,6 +935,7 @@ void fader(uint32_t cycletime) {
     ContLoopMillis = millis(); // if the stepsize = 0 (ie the change is superslow and LEDs don't need to be updated every cycle, keep counting time
   }
 }
+*/
 
 
 
