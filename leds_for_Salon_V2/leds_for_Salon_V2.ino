@@ -67,12 +67,12 @@ unsigned long CommsTimeout = 200;    // When the program is expecting X bytes to
 /// For Cont loop timing
 unsigned long ContLoopMillis = 0;  // will store last time at the end of the previous CONT loop
 byte LoopDelayCounter = 0; // allows to skip a number of loopcycles in Cont Modes.
-byte ContCurrentStep = 0; //For iterations in Cont Loops, to keep the 'current step' and add +1 each time the loop runs
+unsigned long ContCurrentStep = 0; //For iterations in Cont Loops, to keep the 'current step' and add +1 each time the loop runs
 byte invert = 1; // allows for fade in to turn to fadeout
 byte ContLoopIteration = 0;
 
 //DIAGNOSTIC TOOLS
-byte Diagnostic = 1;                // switches on all kinds of diagnostic feedback from various locations in the program
+byte Diagnostic = 0;                // switches on all kinds of diagnostic feedback from various locations in the program
 byte LooptimeDiag = 0;              // minimal feedback for checking efficiency: only feeds back looptime
 int ArrayDiag = 0;                 // if switched on, prints all arrays every cycle
 unsigned long Slowdown = 0;                  // Delay value (ms) added to each loop, only in 'Diagnostic' mode to allow inspecting the data coming back over serial
@@ -92,7 +92,7 @@ byte ModeButtonState = 0;
 byte ModeLoopState = 1; // OnceModes are automatically set back to '0' at the end of the loop. Thi is to carry over the previous mode to be able to iterate through ONceMOdes
 unsigned long ModeButtonLastClick = 0;
 unsigned long ButtonClickTimer = 700; //once a button click is read, it's ignored for ButtenClickTimer ms
-byte ButtonModeTable[10] = { 10, 11, 12, 13, 14, 15, 16, 101, 102, 3 }; // determines which presets, and in what order are cycled
+byte ButtonModeTable[10] = { 10, 11, 12, 13, 14, 15, 16, 101, 102 }; // determines which presets, and in what order are cycled
 //ColorButton
 const int ColorButtonPin = 5;     // middle button the number of the pushbutton pin
 byte ColorButtonState = 0;
@@ -227,7 +227,8 @@ void setup() {
     delay(10);
     strip.show();              // Refresh LED states
   }
-SetMode(101);
+SetMode(102);
+Slowdown= 0 ;
 }
 
 //**********************************************************
@@ -261,7 +262,7 @@ void loop()
 
     if (ModeButtonState) {
       ModeLoopState++ ;
-      if (ModeLoopState > 9) {
+      if (ModeLoopState > 8) {
         ModeLoopState = 0;
       }
       Mode = ButtonModeTable[ModeLoopState];
@@ -608,7 +609,7 @@ void loop()
           Serial.println("[ Continuous Mode 1 - medium rainbowcycle");
         }
  //       newrainbowCycle(10);
-        rainbowCycle(10);
+       newrainbow(0);
 
         break;
       }
@@ -618,8 +619,8 @@ void loop()
         if (Diagnostic == 1) {
           Serial.println("[ Continuous Mode 2 - slow rainbowcycle");
         }
-  //      rainbowCycle(2);
-                rainbowCycle(100);
+newrainbowCycle(50);
+        //     newrainbow(50);
 
         break;
       }
@@ -628,7 +629,7 @@ void loop()
         if (Diagnostic == 1) {
           Serial.println("[ Continuous Mode 1 - fill in details later");
         }
-        rainbow(5);
+        newrainbow(5);
 
         break;
       }
@@ -842,77 +843,62 @@ void colorWipe(uint32_t c, uint8_t wait) {
 //
 void rainbow(uint8_t wait) {
   uint16_t i, j;
-  if (!LoopDelayCounter) {
-    for (j = 0; j < 256; j++) {
-      for (i = 0; i < strip.numPixels(); i++) {
-        strip.setPixelColor(i, Wheel((i + j) & 255));
-      }
-      strip.show();
-    }
-  }
-  LoopDelayCounter++;
-  if (LoopDelayCounter > wait) {
-    LoopDelayCounter = 0;
-  }
-}
-
-/// attempting better timing:
-void newrainbow(byte wait) {
-  byte i, j;
-// Serial.print("Loopiteration at start: 
 
 
-if (!ContLoopIteration){
   for (j = 0; j < 256; j++) {
     for (i = 0; i < strip.numPixels(); i++) {
       strip.setPixelColor(i, Wheel((i + j) & 255));
     }
-    strip.show();}
-    
-    ContLoopIteration++;
-      if (ContLoopIteration > wait) {ContLoopIteration=0;}
-      
+    strip.show();
+    delay(wait);
 
   }
+}
+
+/// attempting better timing:
+void newrainbow(uint8_t wait) {
+  uint16_t i;
+  ContCurrentStep +=1;
+  if (ContCurrentStep ==256) { ContCurrentStep = 0;}
+// Serial.println(ContCurrentStep);
+
+    for (i = 0; i < strip.numPixels(); i++) {
+      strip.setPixelColor(i, Wheel((i + ContCurrentStep) & 255));
+    }
+    strip.show();
+    delay(wait);
 }
 
 
 // Slightly different, this makes the rainbow equally distributed throughout
 void rainbowCycle(uint8_t wait) {
-  uint16_t i, j;
+uint16_t i, j;
 
-  if (!LoopDelayCounter) {
-    for (j = 0; j < 256 * 5; j++) { // 5 cycles of all colors on wheel
-      for (i = 0; i < strip.numPixels(); i++) {
-        strip.setPixelColor(i, Wheel(((i * 256 / strip.numPixels()) + j) & 255));
-      }
-      strip.show();
-    }
-
-    LoopDelayCounter++;
-    if (LoopDelayCounter > wait) {
-      LoopDelayCounter = 0;
-    }
-  }
+for(j=0; j<256*5; j++) { // 5 cycles of all colors on wheel
+for(i=0; i< strip.numPixels(); i++) {
+strip.setPixelColor(i, Wheel(((i * 256 / strip.numPixels()) + j) & 255));
 }
+strip.show();
+delay(wait);
+}
+}
+
 
 // trying with corrected timgin 
 void newrainbowCycle(uint8_t wait) {
-  uint16_t i;
-  
-  if (!ContLoopIteration){
-    ContCurrentStep +=1;
-    if (ContCurrentStep > 255 * 5) {ContCurrentStep = 0; delay (200);}
-   // 5 cycles of all colors on wheel
-    for (i = 0; i < strip.numPixels(); i++) {
-      strip.setPixelColor(i, Wheel(((i * 256 / strip.numPixels()) + ContCurrentStep) & 255));
-    }
-    strip.show();}
-    
-    ContLoopIteration++;
-    if (ContLoopIteration > wait) {ContLoopIteration=0;}
-  
+uint16_t i, j;
+
+ContCurrentStep +=1;
+  if (ContCurrentStep ==256*5) { ContCurrentStep = 0;}
+
+for(i=0; i< strip.numPixels(); i++) {
+strip.setPixelColor(i, Wheel(((i * 256 / strip.numPixels()) + ContCurrentStep) & 255));
 }
+strip.show();
+delay(wait);
+
+}
+
 
 //Theatre-style crawling lights.
 void theaterChase(uint32_t c, uint8_t wait) {
